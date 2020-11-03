@@ -1,0 +1,27 @@
+---
+  - name: Yum update to latest version
+    yum:
+      name: "*"
+      state: latest
+      update_cache: true
+  - name: Copy hosts file
+    template:
+      src: hosts
+      dest: /etc/hosts
+      owner: root
+      mode: 0644
+  - name: Install Openstack Train
+    yum:
+      name:
+      - centos-release-openstack-train
+  - name: Install Additional Packages
+    yum:
+      name:
+      - python-openstackclient
+      - openstack-selinux
+      state: present
+  - name: Disable and stop firewalld
+    systemd:
+      name: firewalld.service
+      state: stopped
+      enabled: no

@@ -1,0 +1,74 @@
+---
+  - name: Create the glance database
+    mysql_db:
+      name: glance
+      state: present
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Set mysql user privileges
+    mysql_user:
+      name: glance
+      password: '{{secret}}'
+      host: '%'
+      priv: 'glance.*:ALL'
+      state: present
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Set mysql user privileges
+    mysql_user:
+      name: glance
+      password: '{{secret}}'
+      host: 'localhost'
+      priv: 'glance.*:ALL'
+      state: present
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Create Glance User
+    shell: openstack user create --password {{secret}} --domain default glance
+    environment: "{{ admin_rc }}"
+  - name: Add glance user to role
+    shell: openstack role add --project service --user glance admin
+    environment: "{{ admin_rc }}"
+  - name: Create Glance service
+    shell: openstack service create --name glance --description "OpenStack Image" image
+    environment: "{{ admin_rc }}"
+  - name: create public endpoint
+    shell: openstack endpoint create --region RegionOne image public http://{{controller}}:9292
+    environment: "{{ admin_rc }}"
+  - name: create internal endpoint
+    shell: openstack endpoint create --region RegionOne image internal http://{{controller}}:9292
+    environment: "{{ admin_rc }}"
+  - name: create admin endpoint
+    shell: openstack endpoint create --region RegionOne image admin http://{{controller}}:9292
+    environment: "{{ admin_rc }}"
+  - name: Install Glance
+    yum:
+      name:
+      - openstack-glance
+      state: present
+  - name: Configure glance-api.conf
+    template:
+      src: templates/glance-api.conf
+      dest: /etc/glance/glance-api.conf
+      owner: root
+      mode: 0640
+  - name: Configure glance-registry.conf
+    template:
+      src: templates/glance-registry.conf
+      dest: /etc/glance/glance-registry.conf
+      owner: root
+      mode: 0640
+  - name: Populate the Image service database
+    shell: su -s /bin/sh -c "glance-manage db_sync" glance
+    ignore_errors: yes
+  - name: Enable and start services
+    systemd:
+      name: openstack-glance-api.service
+      state: started
+      enabled: yes
+  - name: Enable and start services
+    systemd: 
+      name: openstack-glance-registry.service
+      state: started
+      enabled: yes
+  - name: Restart httpd
+    systemd:
+      name: httpd
+      state: restarted

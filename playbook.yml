@@ -1,0 +1,48 @@
+---
+- hosts: openstack_dev
+  become: true
+  roles:
+    - server_prep
+- hosts: 172.16.209.111
+  become: true
+  roles:
+    - controller_prep
+    - controller_keystone
+    - controller_glance
+    - controller_placement
+    - controller_nova
+    - compute_nova
+    - controller_neutron
+    - controller_cinder
+    - controller_horizon
+  vars:
+     secret: 3e35f32422a0c1bc08d2
+     controller: tst-ctrl
+     controller_ip: 172.16.209.111
+     admin_rc:
+       OS_PROJECT_DOMAIN_NAME: Default
+       OS_USER_DOMAIN_NAME: Default
+       OS_PROJECT_NAME: admin
+       OS_USERNAME: admin
+       OS_PASSWORD: 3e35f32422a0c1bc08d2
+       OS_AUTH_URL: http://tst-ctrl:5000/v3
+       OS_IDENTITY_API_VERSION: 3
+       OS_IMAGE_API_VERSION: 2
+- hosts: 172.16.209.112
+  become: true
+  roles:
+    - compute_nova
+    - compute_neutron
+  vars:
+     secret: 3e35f32422a0c1bc08d2
+     controller: tst-ctrl
+     compute_ip: 172.16.209.112
+- hosts: 172.16.209.113
+  become: true
+  roles:
+    - storage_cinder
+  vars:
+     secret: 3e35f32422a0c1bc08d2
+     controller: tst-ctrl
+     storage_ip: 172.16.209.113
+

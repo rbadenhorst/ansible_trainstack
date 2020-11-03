@@ -1,0 +1,79 @@
+---
+  - name: Create the cinder database
+    mysql_db:
+      name: cinder
+      state: present
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Set mysql user privileges
+    mysql_user:
+      name: cinder
+      password: '{{secret}}'
+      host: '%'
+      priv: 'cinder.*:ALL'
+      state: present
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Set mysql user privileges
+    mysql_user:
+      name: cinder
+      password: '{{secret}}'
+      host: 'localhost'
+      priv: 'cinder.*:ALL'
+      state: present
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Create cinder User
+    command: openstack user create --password {{secret}} --domain default cinder
+    environment: "{{ admin_rc }}"
+  - name: Add cinder user to role
+    command: openstack role add --project service --user cinder admin
+    environment: "{{ admin_rc }}"
+  - name: Create cinderv2 service
+    command: openstack service create --name cinderv2 --description "OpenStack Block Storage" volumev2
+    environment: "{{ admin_rc }}"
+  - name: Create cinderv3 service
+    command: openstack service create --name cinderv3 --description "OpenStack Block Storage" volumev3
+    environment: "{{ admin_rc }}"
+  - name: create public endpoint
+    command: openstack endpoint create --region RegionOne volumev2 public http://{{controller}}:8776/v2/%\(project_id\)s
+    environment: "{{ admin_rc }}"
+  - name: create internal endpoint
+    command: openstack endpoint create --region RegionOne volumev2 internal http://{{controller}}:8776/v2/%\(project_id\)s
+    environment: "{{ admin_rc }}"
+  - name: create admin endpoint
+    command: openstack endpoint create --region RegionOne volumev2 admin http://{{controller}}:8776/v2/%\(project_id\)s
+    environment: "{{ admin_rc }}"
+  - name: create public endpoint
+    command: openstack endpoint create --region RegionOne volumev3 public http://{{controller}}:8776/v3/%\(project_id\)s
+    environment: "{{ admin_rc }}"
+  - name: create internal endpoint
+    command: openstack endpoint create --region RegionOne volumev3 internal http://{{controller}}:8776/v3/%\(project_id\)s
+    environment: "{{ admin_rc }}"
+  - name: create admin endpoint
+    command: openstack endpoint create --region RegionOne volumev3 admin http://{{controller}}:8776/v3/%\(project_id\)s
+    environment: "{{ admin_rc }}"
+  - name: Install openstack-cinder
+    yum:
+      name:
+      - openstack-cinder
+      state: present
+  - name: create cinder configuration file
+    template:
+      src: templates/cinder.conf
+      dest: /etc/cinder/cinder.conf
+      owner: root
+      mode: 0640
+  - name: Populate the cinder database
+    shell: su -s /bin/sh -c "cinder-manage db sync" cinder
+    ignore_errors: yes
+  - name: Enable and start openstack-nova-api.service
+    systemd:
+      name: openstack-nova-api.service
+      state: restarted
+      enabled: yes
+  - name: Restart openstack-cinder-api.service
+    systemd:
+      name: openstack-cinder-api.service 
+      state: restarted
+  - name: Restart openstack-cinder-scheduler.service
+    systemd:
+      name: openstack-cinder-scheduler.service
+      state: restarted

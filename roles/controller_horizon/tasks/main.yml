@@ -1,0 +1,76 @@
+---
+  - name: Install openstack-dashboard
+    yum:
+      name:
+      - openstack-dashboard
+      state: present
+  - name:
+    lineinfile:
+      path: /etc/openstack-dashboard/local_settings
+      line: WEBROOT = '/dashboard/'
+  - name: Configure the dashboard to use OpenStack services on the controller node
+    lineinfile:
+      path: /etc/openstack-dashboard/local_settings
+      regexp: '^OPENSTACK_HOST = "127.0.0.1"'
+      line: OPENSTACK_HOST = "{{ controller }}"
+  - name: Allow hosts to access the dashboard
+    lineinfile:
+      path: /etc/openstack-dashboard/local_settings
+      regexp: '^ALLOWED_HOSTS'
+      line: ALLOWED_HOSTS = ['*']
+  - name: Configure session engine
+    lineinfile:
+      path: /etc/openstack-dashboard/local_settings
+      insertafter: '^#SESSION_ENGINE'
+      line: SESSION_ENGINE = 'django.contrib.sessions.backends.signed_cookies'
+  - name: Enable support for domains
+    lineinfile:
+      path: /etc/openstack-dashboard/local_settings
+      insertafter: '^OPENSTACK_KEYSTONE_URL'
+      line: OPENSTACK_KEYSTONE_MULTIDOMAIN_SUPPORT = True
+  - name: Configure Default as the default domain for users that you create via the dashboard
+    lineinfile:
+      path: /etc/openstack-dashboard/local_settings
+      insertafter: '^OPENSTACK_KEYSTONE_URL'
+      line: OPENSTACK_KEYSTONE_DEFAULT_DOMAIN = "Default"
+  - name: Configure user as the default role for users that you create via the dashboard
+    lineinfile:
+      path: /etc/openstack-dashboard/local_settings
+      insertafter: '^OPENSTACK_KEYSTONE_URL'
+      line: OPENSTACK_KEYSTONE_DEFAULT_ROLE = "user"
+  - name: Configure CACHE
+    blockinfile:
+      path: /etc/openstack-dashboard/local_settings
+      insertafter: '^SESSION_ENGINE'
+      block: |
+        CACHES = {
+           'default': {
+                 'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
+                  'LOCATION': '{{ controller }}:11211',
+           }
+        }
+  - name: Configure API versions
+    blockinfile:
+      path: /etc/openstack-dashboard/local_settings
+      insertafter: '^OPENSTACK_KEYSTONE_MULTIDOMAIN_SUPPORT'
+      block: |
+        OPENSTACK_API_VERSIONS = {
+           "identity": 3,
+           "image": 2,
+           "volume": 2,
+        }
+  - name: 
+    lineinfile:
+      path: /etc/httpd/conf.d/openstack-dashboard.conf
+      line: WSGIApplicationGroup %{GLOBAL}
+      state: present
+  - name: Restart memcached service
+    systemd:
+      name: memcached.service
+      state: restarted
+      enabled: yes
+  - name: Restart http service
+    systemd:
+      name: httpd.service
+      state: restarted
+      enabled: yes

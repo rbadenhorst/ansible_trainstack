@@ -1,0 +1,140 @@
+---
+  - name: Create the nova database
+    mysql_db:
+      name: nova
+      state: present
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Set mysql user privileges for nova database
+    mysql_user:
+      name: nova
+      password: '{{secret}}'
+      host: '%'
+      priv: 'nova.*:ALL'
+      state: present
+      append_privs: yes
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Set mysql user privileges for nova database
+    mysql_user:
+      name: nova
+      password: '{{secret}}'
+      host: 'localhost'
+      priv: 'nova.*:ALL'
+      state: present
+      append_privs: yes
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Create the nova-api database
+    mysql_db:
+      name: nova_api
+      state: present
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Set mysql user privileges for nova-api database
+    mysql_user:
+      name: nova
+      password: '{{secret}}'
+      host: '%'
+      priv: 'nova_api.*:ALL'
+      state: present
+      append_privs: yes
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Set mysql user privileges for nova-api database
+    mysql_user:
+      name: nova
+      password: '{{secret}}'
+      host: 'localhost'
+      priv: 'nova_api.*:ALL'
+      state: present
+      append_privs: yes
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Create the nova_cell0 database
+    mysql_db:
+      name: nova_cell0
+      state: present
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Set mysql user privileges for nova-cell0 database
+    mysql_user:
+      name: nova
+      password: '{{secret}}'
+      host: '%'
+      priv: 'nova_cell0.*:ALL'
+      state: present
+      append_privs: yes
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Set mysql user privileges for nova-cell0 database
+    mysql_user:
+      name: nova
+      password: '{{secret}}'
+      host: 'localhost'
+      priv: 'nova_cell0.*:ALL'
+      state: present
+      append_privs: yes
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Create Nova User
+    command: openstack user create --password {{secret}} --domain default nova
+    environment: "{{ admin_rc }}"
+  - name: Add glance user to role
+    command: openstack role add --project service --user nova admin
+    environment: "{{ admin_rc }}"
+  - name: Create compute service
+    command: openstack service create --name nova --description "OpenStack Compute" compute
+    environment: "{{ admin_rc }}"
+  - name: create public endpoint
+    command: openstack endpoint create --region RegionOne compute public http://{{controller}}:8774/v2.1
+    environment: "{{ admin_rc }}"
+  - name: create internal endpoint
+    command: openstack endpoint create --region RegionOne compute internal http://{{controller}}:8774/v2.1
+    environment: "{{ admin_rc }}"
+  - name: create admin endpoint
+    command: openstack endpoint create --region RegionOne compute admin http://{{controller}}:8774/v2.1
+    environment: "{{ admin_rc }}"
+  - name: Install Nova
+    yum:
+      name:
+      - openstack-nova-api
+      - openstack-nova-conductor 
+      - openstack-nova-novncproxy
+      - openstack-nova-scheduler
+      state: present
+  - name: Configure nova.conf
+    template:
+      src: templates/nova.conf
+      dest: /etc/nova/nova.conf
+      owner: root
+      mode: 0640
+  - name: Do api_db sync
+    shell: su -s /bin/sh -c "nova-manage api_db sync" nova
+    environment: "{{ admin_rc }}"
+  - name: Do su -s /bin/sh -c "nova-manage api_db sync" nova
+    shell: su -s /bin/sh -c "nova-manage api_db sync" nova
+    environment: "{{ admin_rc }}"
+  - name: Do su -s /bin/sh -c "nova-manage cell_v2 map_cell0" nova
+    shell: su -s /bin/sh -c "nova-manage cell_v2 map_cell0" nova
+    environment: "{{ admin_rc }}"
+  - name: Do su -s /bin/sh -c "nova-manage cell_v2 create_cell --name=cell1 --verbose" nova
+    shell: su -s /bin/sh -c "nova-manage cell_v2 create_cell --name=cell1 --verbose" nova
+    environment: "{{ admin_rc }}"
+  - name: Do su -s /bin/sh -c "nova-manage db sync" nova
+    shell: su -s /bin/sh -c "nova-manage db sync" nova
+    environment: "{{ admin_rc }}"
+  - name: Do su -s /bin/sh -c "nova-manage cell_v2 list_cells" nova
+    shell: su -s /bin/sh -c "nova-manage cell_v2 list_cells" nova
+    environment: "{{ admin_rc }}"        
+  - name: Enable and start openstack-nova-api.service
+    systemd:
+      name: openstack-nova-api.service
+      state: started
+      enabled: yes
+  - name: Enable and start openstack-nova-scheduler.service
+    systemd:
+      name: openstack-nova-scheduler.service
+      state: started
+      enabled: yes
+  - name: Enable and start openstack-nova-conductor.service
+    systemd:
+      name: openstack-nova-conductor.service
+      state: started
+      enabled: yes
+  - name: Enable and start openstack-nova-novncproxy.service
+    systemd:
+      name: openstack-nova-novncproxy.service
+      state: started
+      enabled: yes

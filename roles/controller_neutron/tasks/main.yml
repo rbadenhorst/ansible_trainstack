@@ -1,0 +1,136 @@
+---
+  - name: Create the neutron database
+    mysql_db:
+      name: neutron
+      state: present
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Set mysql user privileges for neutron database
+    mysql_user:
+      name: neutron
+      password: '{{secret}}'
+      host: '%'
+      priv: 'neutron.*:ALL'
+      state: present
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Set mysql user privileges for neutron database
+    mysql_user:
+      name: neutron
+      password: '{{secret}}'
+      host: 'localhost'
+      priv: 'neutron.*:ALL'
+      state: present
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Create Nova User
+    command: openstack user create --password {{secret}} --domain default neutron
+    environment: "{{ admin_rc }}"
+  - name: Add neutron user to role
+    command: openstack role add --project service --user neutron admin
+    environment: "{{ admin_rc }}"
+  - name: Create compute service
+    command: openstack service create --name neutron --description "OpenStack Networking" network
+    environment: "{{ admin_rc }}"
+  - name: create public endpoint
+    command: openstack endpoint create --region RegionOne network public http://{{controller}}:9696
+    environment: "{{ admin_rc }}"
+  - name: create internal endpoint
+    command: openstack endpoint create --region RegionOne network internal http://{{controller}}:9696
+    environment: "{{ admin_rc }}"
+  - name: create admin endpoint
+    command: openstack endpoint create --region RegionOne network admin http://{{controller}}:9696
+    environment: "{{ admin_rc }}"
+  - name: Install neutron
+    yum:
+      name:
+      - openstack-neutron
+      - openstack-neutron-ml2
+      - openstack-neutron-linuxbridge
+      - ebtables
+      state: present
+  - name: create neutron configuration file
+    template:
+      src: templates/neutron.conf
+      dest: /etc/neutron/neutron.conf
+      owner: root
+      mode: 0640
+  - name: create ml2 configuration file
+    template:
+      src: templates/ml2_conf.ini
+      dest: /etc/neutron/plugins/ml2/ml2_conf.ini
+      owner: root
+      mode: 0640
+  - name: create linuxbridge_agent configuration file
+    template:
+      src: templates/linuxbridge_agent.ini
+      dest: /etc/neutron/plugins/ml2/linuxbridge_agent.ini
+      owner: root
+      mode: 0640
+  - name: modprobe br_netfilter
+    shell: modprobe br_netfilter
+  - name: configure br_netfilter ipv4
+    shell: echo '1' > /proc/sys/net/bridge/bridge-nf-call-iptables
+  - name: configure br_netfilter ipv6
+    shell: echo '1' > /proc/sys/net/bridge/bridge-nf-call-ip6tables
+  - name: create l3_agent configuration file
+    template:
+      src: templates/l3_agent.ini
+      dest: /etc/neutron/l3_agent.ini
+      owner: root
+      mode: 0640
+  - name: create dhcp configuration file
+    template:
+      src: templates/dhcp_agent.ini
+      dest: /etc/neutron/dhcp_agent.ini
+      owner: root
+      mode: 0640
+  - name: create metadata_agent configuration file
+    template:
+      src: templates/metadata_agent.ini
+      dest: /etc/neutron/metadata_agent.ini
+      owner: root
+      mode: 0640
+  - name: Create symbolic link /etc/neutron/plugin.ini
+    file:
+      src: /etc/neutron/plugins/ml2/ml2_conf.ini
+      dest: /etc/neutron/plugin.ini
+      state: link
+  - name: run neutron-db-manage
+    shell: su -s /bin/sh -c "neutron-db-manage --config-file /etc/neutron/neutron.conf --config-file /etc/neutron/plugins/ml2/ml2_conf.ini upgrade head" neutron
+  
+  - name: Enable and start openstack-nova-api.service
+    systemd:
+      name: openstack-nova-api.service
+      state: restarted
+      enabled: yes
+  - name: Enable and start neutron-server.service
+    systemd:
+      name: neutron-server.service 
+      state: started
+      enabled: yes
+  - name: Enable and start neutron-linuxbridge-agent.service 
+    systemd:
+      name: neutron-linuxbridge-agent.service 
+      state: started
+      enabled: yes
+  - name: Enable and start neutron-dhcp-agent.service 
+    systemd:
+      name: neutron-dhcp-agent.service 
+      state: started
+      enabled: yes
+  - name: Enable and start neutron-metadata-agent.service 
+    systemd:
+      name: neutron-metadata-agent.service 
+      state: started
+      enabled: yes
+  - name: Enable and start neutron-l3-agent.service
+    systemd:
+      name: neutron-l3-agent.service
+      state: started
+      enabled: yes
+  - name: Add ens224 with nmcli
+    command: nmcli con add type ethernet con-name ens224 ifname ens224
+  - name: Set ens224 to static
+    lineinfile:
+      path: /etc/sysconfig/network-scripts/ifcfg-ens224
+      regexp: '^BOOTPROTO='
+      line: BOOTPROTO=none
+

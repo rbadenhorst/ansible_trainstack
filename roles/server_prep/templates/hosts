@@ -1,0 +1,5 @@
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+172.16.209.111	tst-ctrl
+172.16.209.112	tst-comp-01
+172.16.209.113	tst-stor-01

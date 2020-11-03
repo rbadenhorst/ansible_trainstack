@@ -1,0 +1,63 @@
+---
+  - name: Create the placement database
+    mysql_db:
+      name: placement
+      state: present
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Set mysql user privileges
+    mysql_user:
+      name: placement
+      password: '{{secret}}'
+      host: '%'
+      priv: 'placement.*:ALL'
+      state: present
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Set mysql user privileges
+    mysql_user:
+      name: placement
+      password: '{{secret}}'
+      host: 'localhost'
+      priv: 'placement.*:ALL'
+      state: present
+      login_unix_socket: /var/lib/mysql/mysql.sock
+  - name: Create Placement User
+    command: openstack user create --password {{secret}} --domain default placement
+    environment: "{{ admin_rc }}"
+  - name: Add placement user to role
+    command: openstack role add --project service --user placement admin
+    environment: "{{ admin_rc }}"
+  - name: Create placement service
+    command: openstack service create --name placement --description "Placement API" placement
+    environment: "{{ admin_rc }}"
+  - name: create public endpoint
+    command: openstack endpoint create --region RegionOne placement public http://{{controller}}:8778
+    environment: "{{ admin_rc }}"
+  - name: create internal endpoint
+    command: openstack endpoint create --region RegionOne placement internal http://{{controller}}:8778
+    environment: "{{ admin_rc }}"
+  - name: create admin endpoint
+    command: openstack endpoint create --region RegionOne placement admin http://{{controller}}:8778
+    environment: "{{ admin_rc }}"
+  - name: Install openstack-placement-api
+    yum:
+      name:
+      - openstack-placement-api
+      state: present
+  - name: Configure placement.conf
+    template:
+      src: templates/placement.conf
+      dest: /etc/placement/placement.conf
+      owner: root
+      mode: 0640
+  - name: Append to 00-placement-api.conf
+    lineinfile:
+      dest: /etc/httpd/conf.d/00-placement-api.conf
+      insertafter: "^</Location> "
+      line: "{{ lookup('file', '00-placement-api.conf') }}"
+  - name: Populate the placement database
+    shell: su -s /bin/sh -c "placement-manage db sync" placement
+    ignore_errors: yes
+  - name: Restart httpd
+    systemd:
+      name: httpd
+      state: restarted

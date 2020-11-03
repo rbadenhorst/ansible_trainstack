@@ -1,0 +1,41 @@
+---
+  - name: Install lvm2 device-mapper-persistent-data
+    yum:
+      name:
+      - lvm2
+      - device-mapper-persistent-data
+      state: present
+  - name: Start and enable lvm2
+    systemd:
+      name: lvm2-lvmetad
+      state: restarted
+  - name: pvcreate /dev/sdb
+    command: pvcreate /dev/sdb
+  - name: vgcreate cinder-volumes /dev/sdb
+    command: vgcreate cinder-volumes /dev/sdb
+  - name: Exclude the disk from LVM view
+    lineinfile:
+      path: /etc/lvm/lvm.conf
+      insertafter: '^devices '
+      line: filter = [ "a/sda/", "a/sdb/", "r/.*/"]
+  - name: Install openstack-cinder targetcli python-keystone
+    yum:
+      name:
+      - openstack-cinder
+      - targetcli
+      - python-keystone
+      state: present
+  - name: create cinder configuration file
+    template:
+      src: templates/cinder.conf
+      dest: /etc/cinder/cinder.conf
+      owner: root
+      mode: 0640
+  - name: Start and enable openstack-cinder-volume.service
+    systemd:
+      name: openstack-cinder-volume.service
+      state: restarted
+  - name: Start and enable target.service
+    systemd:
+      name: target.service
+      state: restarted

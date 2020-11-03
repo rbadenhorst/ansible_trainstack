@@ -1,0 +1,43 @@
+---
+  - name: Install neutron
+    yum:
+      name:
+      - openstack-neutron-linuxbridge
+      - ebtables
+      - ipset
+      state: present
+  - name: create neutron configuration file
+    template:
+      src: templates/neutron.conf
+      dest: /etc/neutron/neutron.conf
+      owner: root
+      mode: 0640
+  - name: create linuxbridge_agent configuration file
+    template:
+      src: templates/linuxbridge_agent.ini
+      dest: /etc/neutron/plugins/ml2/linuxbridge_agent.ini
+      owner: root
+      mode: 0640
+  - name: modprobe br_netfilter
+    shell: modprobe br_netfilter
+  - name: configure br_netfilter ipv4
+    shell: echo '1' > /proc/sys/net/bridge/bridge-nf-call-iptables
+  - name: configure br_netfilter ipv6
+    shell: echo '1' > /proc/sys/net/bridge/bridge-nf-call-ip6tables
+  - name: Restart openstack-nova-compute.service
+    systemd:
+      name: openstack-nova-compute.service
+      state: restarted
+      enabled: yes
+  - name: Enable and start neutron-linuxbridge-agent.service
+    systemd:
+      name: neutron-linuxbridge-agent.service
+      state: started
+      enabled: yes
+  - name: Add ens224 with nmcli
+    command: nmcli con add type ethernet con-name ens224 ifname ens224
+  - name: Set ens224 to static
+    lineinfile:
+      path: /etc/sysconfig/network-scripts/ifcfg-ens224
+      regexp: '^BOOTPROTO='
+      line: BOOTPROTO=none
