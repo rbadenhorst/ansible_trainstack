@@ -1,8 +1,0 @@
----
-  - name: test env
-    shell: /usr/bin/env > /tmp/out
-    environment: '{{ admin_rc }}'
-  - name: make project
-    shell: openstack project create --domain default --description "Service Project" service
-    environment: '{{ admin_rc }}'
-
